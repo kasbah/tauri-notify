@@ -1,31 +1,39 @@
-#![cfg_attr(
-    all(not(debug_assertions), target_os = "windows"),
-    windows_subsystem = "windows"
-)]
-
 use notify::{RecursiveMode, Result, Watcher};
 use std::path::Path;
 
 fn main() -> Result<()> {
-    println!("hello!");
-    let mut watcher = notify::recommended_watcher(|res| match res {
-        Ok(event) => println!("event: {:?}", event),
+    let mut watcher1 = notify::recommended_watcher(move |res| match res {
+        Ok(event) => {
+            // does get printed
+            println!("watcher1 event: {:?}", event);
+        }
         Err(e) => println!("watch error: {:?}", e),
-    })?;
+    })
+    .expect("error creating file watcher");
 
-    // Add a path to be watched. All files and directories at that path and
-    // below will be monitored for changes.
-    watcher.watch(Path::new("."), RecursiveMode::Recursive)?;
+    watcher1
+        .watch(Path::new("."), RecursiveMode::Recursive)
+        .expect("error watching folder");
 
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![greet])
+        .setup(|_app| {
+            let mut watcher2 = notify::recommended_watcher(move |res| match res {
+                Ok(event) => {
+                    // does not get printed
+                    println!("watcher2 event: {:?}", event);
+                }
+                Err(e) => println!("watch error: {:?}", e),
+            })
+            .expect("error creating file watcher");
+
+            watcher2
+                .watch(Path::new("."), RecursiveMode::Recursive)
+                .expect("error watching folder");
+
+            Ok(())
+        })
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .expect("error while running tauri builder");
 
     Ok(())
-}
-
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}!", name)
 }

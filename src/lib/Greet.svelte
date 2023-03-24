@@ -1,4 +1,5 @@
 <script>
+	import { listen } from '@tauri-apps/api/event';
 	import { invoke } from '@tauri-apps/api/tauri';
 
 	let name = '';
@@ -7,6 +8,9 @@
 	async function greet() {
 		greetMsg = await invoke('greet', { name });
 	}
+	listen('file-event', (event) => {
+		console.log({ event });
+	});
 </script>
 
 <div>
