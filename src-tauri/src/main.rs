@@ -1,39 +1,45 @@
 use notify::{RecursiveMode, Result, Watcher};
 use std::path::Path;
+use tauri::Manager;
+// the payload type must implement `Serialize` and `Clone`.
+#[derive(Clone, serde::Serialize)]
+struct Payload {
+    message: String,
+}
 
 fn main() -> Result<()> {
-    let mut watcher1 = notify::recommended_watcher(move |res| match res {
+    let app = tauri::Builder::default()
+        .setup(move |_app| Ok(()))
+        .build(tauri::generate_context!())
+        .expect("error while running tauri builder");
+
+    let handle = app.handle();
+
+    let mut watcher = notify::recommended_watcher(move |res| match res {
         Ok(event) => {
-            // does get printed
-            println!("watcher1 event: {:?}", event);
+            handle
+                .emit_all(
+                    "file-event",
+                    Payload {
+                        message: "Tauri is awesome!".into(),
+                    },
+                )
+                .unwrap();
         }
         Err(e) => println!("watch error: {:?}", e),
     })
     .expect("error creating file watcher");
 
-    watcher1
+    watcher
         .watch(Path::new("."), RecursiveMode::Recursive)
         .expect("error watching folder");
 
-    tauri::Builder::default()
-        .setup(|_app| {
-            let mut watcher2 = notify::recommended_watcher(move |res| match res {
-                Ok(event) => {
-                    // does not get printed
-                    println!("watcher2 event: {:?}", event);
-                }
-                Err(e) => println!("watch error: {:?}", e),
-            })
-            .expect("error creating file watcher");
-
-            watcher2
-                .watch(Path::new("."), RecursiveMode::Recursive)
-                .expect("error watching folder");
-
-            Ok(())
-        })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri builder");
+    app.run(|_app_handle, event| match event {
+        tauri::RunEvent::ExitRequested { api, .. } => {
+            api.prevent_exit();
+        }
+        _ => {}
+    });
 
     Ok(())
 }
